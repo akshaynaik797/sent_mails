@@ -23,18 +23,20 @@ def api_update_trigger(ref_no, comment, status):
         b = f"SELECT * from mob_app"
         cur.execute(b)
         r = cur.fetchall()
-    if r is not None:
-        for i in r:
-            # payload = "{\n  \"to\": \"" + i[1] + "\",\n  \"title\":\"Update Status\",\n  \"body\": \"Row took more than " + str(time_diff) + " seconds. Please infrom Varun\"\n}"
-            payload = {
-                "to": i[1],
-                "title": "Please Update Status",
-                "body": body
-            }
-            response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
-            log_data(token=i[1], response=response.text, payload=payload)
-            pass
+        status = ''
+        if r is not None:
+            for i in r:
+                # payload = "{\n  \"to\": \"" + i[1] + "\",\n  \"title\":\"Update Status\",\n  \"body\": \"Row took more than " + str(time_diff) + " seconds. Please infrom Varun\"\n}"
+                payload = {
+                    "to": i[1],
+                    "title": "Please Update Status",
+                    "body": body
+                }
+                response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
+                status = response.status_code
+                log_data(token=i[1], response=response.text, payload=payload)
+    return body, status
 
 if __name__ == "__main__":
-    api_update_trigger('a', 'b', 'c')
+    a = api_update_trigger('a', 'b', 'c')
     pass
