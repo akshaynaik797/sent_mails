@@ -25,7 +25,7 @@ def ins_sentmaillogs(transaction_id, refno, cdate, doc_count, push_content, push
 
 def process_sent_mails():
     htlog_data = []
-    q = "select * from hospitalTLog where transactionID != '' order by srno desc limit 10"
+    q = "select * from hospitalTLog where transactionID != '' order by srno desc limit 100"
     with mysql.connector.connect(**portals_conn_data) as con:
         cur = con.cursor()
         cur.execute(q)
@@ -41,6 +41,7 @@ def process_sent_mails():
     with mysql.connector.connect(**portals_conn_data) as con:
         cur = con.cursor()
         for row in htlog_data:
+            print(row['srno'])
             try:
                 q = "select * from sentmaillogs where transactionID=%s limit 1"
                 cur.execute(q, (row['transactionID'],))
@@ -60,12 +61,14 @@ def process_sent_mails():
                     if r1.status_code == 200:
                         r2_data = r1.json()
                     row['mail_log'], row['doc_details'] = r1_data, r2_data
+                    #cdate, 'docSize'
                     q = "select hospital from sent_mails_config where hospital_id=%s limit 1"
                     cur.execute(q, (data1['hospitalID'],))
                     r = cur.fetchone()
                     hospital = ''
                     if r is not None:
                         hospital = r[0]
+
                     if len(r1_data) == 0:
                         pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "NA")
                         ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody, pstatus)
@@ -96,15 +99,41 @@ def process_sent_mails():
 
                     if len(row['mail_log']) > 0 and len(row['doc_details']) > 0:
                         for temp in row['mail_log']:
-                            mails = search(temp['subjectline'], hospital, '')
+                            mails = search(temp['subjectline'], hospital, row['mail_log'][0]['cdate'])
                             if len(mails) == 0:
                                 pbody, pstatus = api_update_trigger(row['Type_Ref'], "URGENT", "MAIL NOT SENT")
-                                ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
-                                             pstatus)
+                                ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data),
+                                                 pbody, pstatus)
+                            else:
+                                for mail in mails:
+                                    if len(mail['attach_data']) != len(row['doc_details']):
+                                        pbody, pstatus = api_update_trigger(row['Type_Ref'], "URGENT", "COUNT MISMATCH")
+                                        ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
+                                                         len(r2_data),
+                                                         pbody, pstatus)
+                                    mail_doc_size, db_doc_size = 0, 0
+                                    #'docSize'
+                                    for doc in mail['attach_data']:
+                                        try:
+                                            mail_doc_size = mail_doc_size + float(doc['size'])
+                                        except:
+                                            log_exceptions(size=doc['size'])
+                                    for doc in row['doc_details']:
+                                        try:
+                                            db_doc_size = db_doc_size + float(doc['docSize'])
+                                        except:
+                                            log_exceptions(docSize=doc['docSize'])
+                                    if mail_doc_size != db_doc_size:
+                                        pbody, pstatus = api_update_trigger(row['Type_Ref'], "URGENT", "SIZE MISMATCH")
+                                        ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
+                                                         len(r2_data),
+                                                         pbody, pstatus)
             except:
                 log_exceptions(row=row)
 
 if __name__ == '__main__':
     while 1:
+        print('process_sent_mails')
         process_sent_mails()
+        print('done')
         time.sleep(60)

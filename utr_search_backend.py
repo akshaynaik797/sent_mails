@@ -187,11 +187,13 @@ def if_exists(**kwargs):
             return True
     return False
 
-def gmail_api(data, hosp, deferred, text):
+def gmail_api(data, hosp, deferred, text, cdate):
     mails = []
     try:
         print(hosp)
-        attach_path = os.path.join(hosp, 'new_attach/')
+        cdate = datetime.strptime(cdate, '%d/%m/%Y %H:%M:%S')
+        fromtime, totime = cdate-timedelta(minutes=15), cdate+timedelta(minutes=15)
+        fromtime, totime = int(fromtime.timestamp()), int(totime.timestamp())
         token_file = data['data']['token_file']
         cred_file = data['data']['json_file']
         SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -214,7 +216,7 @@ def gmail_api(data, hosp, deferred, text):
         for folder in get_folders(hosp, deferred):
             with open('logs/folders.log', 'a') as tfp:
                 print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
-            q = text
+            q = f"subject:{text} and after:{fromtime} before:{totime}"
             # results = service.users().labels()
             # request = results.list(userId='me')
             results = service.users().messages()
@@ -227,7 +229,7 @@ def gmail_api(data, hosp, deferred, text):
                     pass
                     #print("No messages found.")
                 else:
-                    print("Message snippets:")
+                    # print("Message snippets:")
                     for message in messages[::-1]:
                         temp = {}
                         signal.signal(signal.SIGALRM, alarm_handler)
@@ -491,11 +493,11 @@ def mail_mover(hospital, deferred):
             cur.execute(q, (i['sno'],))
             con.commit()
 
-def search(text, hospital, deferred):
-    mails = []
+def search(text, hospital, cdate):
+    mails, deferred = [], ''
     data, hosp = hospital_data[hospital], hospital
     if data['mode'] == 'gmail_api':
-        mails = gmail_api(data, hosp, deferred, text)
+        mails = gmail_api(data, hosp, deferred, text, cdate)
     # elif data['mode'] == 'graph_api':
     #     graph_api(data, hosp, deferred, utr, utr)
     #     graph_api(data, hosp, deferred, utr, utr2)
