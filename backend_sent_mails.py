@@ -45,8 +45,8 @@ with mysql.connector.connect(**portals_conn_data) as con:
         data1 = {'hospitalID': row['HospitalID'], 'refNo': row['Type_Ref'],
                  'type': row['Type'], 'status': row['status']}
         ####for test purpose
-        data1 = {'hospitalID': '8900080123380', 'refNo': 'NH-1002190',
-                 'type': 'Claim', 'status': 'Sent To TPA/ Insurer'}
+        # data1 = {'hospitalID': '8900080123380', 'refNo': 'NH-1002190',
+        #          'type': 'Claim', 'status': 'Sent To TPA/ Insurer'}
         ####
         if r is None:
             r1_data, r2_data = [], []
@@ -57,23 +57,23 @@ with mysql.connector.connect(**portals_conn_data) as con:
             if r1.status_code == 200:
                 r2_data = r1.json()
             row['mail_log'], row['doc_details'] = r1_data, r2_data
-            # if len(r1_data) == 0:
-            #     pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "NA")
-            #     ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody, pstatus)
-            # else:
-            #     for temp in r1_data:
-            #         if temp['sentornot'] != 'Yes':
-            #             pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "sentornot")
-            #             ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
-            #                              pstatus)
-            #         if temp['saveornot'] != 'Yes':
-            #             pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "saveornot")
-            #             ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
-            #                              pstatus)
-            #         if temp['pagerror'] != 'success':
-            #             pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "pagerror")
-            #             ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
-            #                              pstatus)
+            if len(r1_data) == 0:
+                pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "NA")
+                ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody, pstatus)
+            else:
+                for temp in r1_data:
+                    if temp['sentornot'] != 'Yes':
+                        pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "sentornot")
+                        ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
+                                         pstatus)
+                    if temp['saveornot'] != 'Yes':
+                        pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "saveornot")
+                        ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
+                                         pstatus)
+                    if temp['pagerror'] != 'success':
+                        pbody, pstatus = api_update_trigger(row['Type_Ref'], "mail_log", "pagerror")
+                        ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data), pbody,
+                                         pstatus)
 
             if len(r2_data) == 0:
                 pbody, pstatus = api_update_trigger(row['Type_Ref'], "Documentdetails", "NA")
