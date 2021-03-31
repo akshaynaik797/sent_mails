@@ -24,11 +24,13 @@ def ins_sentmaillogs(transaction_id, refno, cdate, doc_count, push_content, push
         con.commit()
 
 def process_sent_mails():
-    htlog_data = []
-    q = "select * from hospitalTLog where transactionID != '' order by srno desc limit 100"
+    htlog_data, srno = [], 17104
+    # q = "select * from hospitalTLog where transactionID != '' and srno='17104' order by srno desc limit 100"
+    q = "select * from hospitalTLog where transactionID != '' and srno>%s and sent_mails_processed is null order by srno"
     with mysql.connector.connect(**portals_conn_data) as con:
         cur = con.cursor()
-        cur.execute(q)
+        # cur.execute(q)
+        cur.execute(q, (srno,))
         result = cur.fetchall()
 
     for row in result:
@@ -46,8 +48,7 @@ def process_sent_mails():
                 q = "select * from sentmaillogs where transactionID=%s limit 1"
                 cur.execute(q, (row['transactionID'],))
                 r = cur.fetchone()
-                data1 = {'hospitalID': row['HospitalID'], 'refNo': row['Type_Ref'],
-                         'type': row['Type'], 'status': row['status']}
+                data1 = {'hospitalID': row['HospitalID'], 'transactionID': row['transactionID']}
                 ####for test purpose
                 # data1 = {'hospitalID': '8900080123380', 'refNo': 'NH-1002190',
                 #          'type': 'Claim', 'status': 'Sent To TPA/ Insurer'}
@@ -128,6 +129,9 @@ def process_sent_mails():
                                         ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
                                                          len(r2_data),
                                                          pbody, pstatus)
+                q = "update hospitalTLog set sent_mails_processed='X' where srno=%s"
+                cur.execute(q, (row['srno']))
+                con.commit()
             except:
                 log_exceptions(row=row)
 
