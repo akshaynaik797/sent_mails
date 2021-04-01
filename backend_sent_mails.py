@@ -24,12 +24,11 @@ def ins_sentmaillogs(transaction_id, refno, cdate, doc_count, push_content, push
         con.commit()
 
 def process_sent_mails():
-    htlog_data, srno = [], 17104
-    # q = "select * from hospitalTLog where transactionID != '' and srno='17104' order by srno desc limit 100"
+    htlog_data, srno = [], 17673
+    # q = "select * from hospitalTLog where transactionID != '' and srno=%s order by srno desc"
     q = "select * from hospitalTLog where transactionID != '' and srno>%s and sent_mails_processed is null order by srno"
     with mysql.connector.connect(**portals_conn_data) as con:
         cur = con.cursor()
-        # cur.execute(q)
         cur.execute(q, (srno,))
         result = cur.fetchall()
 
@@ -49,10 +48,6 @@ def process_sent_mails():
                 cur.execute(q, (row['transactionID'],))
                 r = cur.fetchone()
                 data1 = {'hospitalID': row['HospitalID'], 'transactionID': row['transactionID']}
-                ####for test purpose
-                # data1 = {'hospitalID': '8900080123380', 'refNo': 'NH-1002190',
-                #          'type': 'Claim', 'status': 'Sent To TPA/ Insurer'}
-                ####
                 if r is None:
                     r1_data, r2_data = [], []
                     r1 = requests.post(mails_log, data=data1)
@@ -62,7 +57,6 @@ def process_sent_mails():
                     if r1.status_code == 200:
                         r2_data = r1.json()
                     row['mail_log'], row['doc_details'] = r1_data, r2_data
-                    #cdate, 'docSize'
                     q = "select hospital from sent_mails_config where hospital_id=%s limit 1"
                     cur.execute(q, (data1['hospitalID'],))
                     r = cur.fetchone()
@@ -113,7 +107,6 @@ def process_sent_mails():
                                                          len(r2_data),
                                                          pbody, pstatus)
                                     mail_doc_size, db_doc_size = 0, 0
-                                    #'docSize'
                                     for doc in mail['attach_data']:
                                         try:
                                             mail_doc_size = mail_doc_size + float(doc['size'])
@@ -129,8 +122,18 @@ def process_sent_mails():
                                         ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
                                                          len(r2_data),
                                                          pbody, pstatus)
+                #write entry in sentmaillogs if push not triggred for tran id
+                #'7946217ee3ef2d205cff5422e195c26e_309t3duj8ou949oul6k4jmbb1k'
+                con.commit()
+                q = "select * from sentmaillogs where transactionID=%s limit 1"
+                cur.execute(q, (row['transactionID'],))
+                r = cur.fetchone()
+                if r is None:
+                    ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
+                                     len(r2_data),
+                                     '', '')
                 q = "update hospitalTLog set sent_mails_processed='X' where srno=%s"
-                cur.execute(q, (row['srno']))
+                cur.execute(q, (row['srno'],))
                 con.commit()
             except:
                 log_exceptions(row=row)
