@@ -43,7 +43,7 @@ def ins_sentmaillogs(transaction_id, refno, cdate, doc_count, push_content, push
         con.commit()
 
 def process_sent_mails():
-    htlog_data, srno = [], 17770
+    htlog_data, srno = [], 18158
 
     q = "select * from hospitalTLog where transactionID != '' and srno>%s and sent_mails_processed is null order by srno"
 
@@ -130,7 +130,7 @@ def process_sent_mails():
                                                  pstatus)
                                 cond_flag = 1
 
-                    if len(row['mail_log']) > 0 and len(row['doc_details']) > 0 and hospital != '':
+                    if len(row['mail_log']) > 0 and hospital != '':
                         for temp in row['mail_log']:
                             mails = search(temp['subjectline'], hospital, row['mail_log'][0]['cdate'])
                             if len(mails) == 0:

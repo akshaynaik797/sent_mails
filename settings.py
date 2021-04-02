@@ -20,7 +20,7 @@ portals_conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.co
 
 host = "http://3.7.8.68:9982"
 
-time_out = 60 #seconds
+time_out = 6000 #seconds
 mail_time = 40 #minutes
 interval = 60 #seconds
 
@@ -171,7 +171,7 @@ def save_attachment(msg, download_folder, **kwargs):
 
     return: file path to attachment
     """
-    att_path = []
+    attach_data = []
     flag = 0
     filename = None
     file_seq = file_no(4)
@@ -184,32 +184,7 @@ def save_attachment(msg, download_folder, **kwargs):
             continue
         flag = 1
         filename = part.get_filename()
-        if filename is not None and file_blacklist(filename, email=kwargs['email']):
-            if not os.path.isfile(filename):
-                fp = open(os.path.join(download_folder, file_seq + filename), 'wb')
-                fp.write(part.get_payload(decode=True))
-                fp.close()
-                att_path.append(os.path.join(download_folder, file_seq + filename))
-    if flag == 0 or filename is None or len(att_path) == 0:
-        for part in msg.walk():
-            if part.get_content_type() == 'text/plain':
-                filename = 'text.txt'
-                fp = open(os.path.join(download_folder, filename), 'wb')
-                data = part.get_payload(decode=True)
-                fp.write(data)
-                fp.close()
-                att_path = os.path.join(download_folder, filename)
-            if part.get_content_type() == 'text/html':
-                filename = 'text.html'
-                fp = open(os.path.join(download_folder, filename), 'wb')
-                data = part.get_payload(decode=True)
-                fp.write(data)
-                fp.close()
-                with open(os.path.join(download_folder, filename), 'r', encoding='utf-8') as fp:
-                    data = fp.read()
-                data = remove_img_tags(data)
-                with open(os.path.join(download_folder, filename), 'w', encoding='utf-8') as fp:
-                    fp.write(data)
-                att_path = os.path.join(download_folder, filename)
-                pass
-    return att_path
+        if filename is not None:
+            size = len(part.get_payload(decode=True))
+            attach_data.append({'name': filename, 'size': size})
+    return attach_data

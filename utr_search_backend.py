@@ -280,11 +280,14 @@ def gmail_api(data, hosp, deferred, text, cdate):
     finally:
         return mails
 
-def graph_api(data, hosp, deferred, utr, utr2):
+def graph_api(data, hosp, deferred, text, cdate):
     try:
+        mails = []
         print(hosp)
-        after = datetime.now() - timedelta(minutes=mail_time)
-        after = after.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        cdate = datetime.strptime(cdate, '%d/%m/%Y %H:%M:%S')
+        fromtime, totime = cdate-timedelta(minutes=15), cdate+timedelta(minutes=15)
+        fromtime = fromtime.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        totime = totime.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         attachfile_path = os.path.join(hosp, 'new_attach/')
         email = data['data']['email']
         cred_file = data['data']['json_file']
@@ -297,17 +300,11 @@ def graph_api(data, hosp, deferred, utr, utr2):
         if not result:
             logging.info("No suitable token exists in cache. Let's get a new one from AAD.")
             result = app.acquire_token_for_client(scopes=config["scope"])
-        after = datetime.now() - timedelta(minutes=mail_time)
-        after = after.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         if "access_token" in result:
             for folder in get_folders(hosp, deferred):
                 with open('logs/folders.log', 'a') as tfp:
                     print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
-                flag = 0
-                while 1:
-                    if flag == 0:
-                        query = f'https://graph.microsoft.com/v1.0/users/{email}/messages?$search="{utr2}"'
-                    flag = 1
+                    query = f'https://graph.microsoft.com/v1.0/users/{email}/messages?$search="{text}"'
                     graph_data2 = requests.get(query,
                                                headers={'Authorization': 'Bearer ' + result['access_token']}, ).json()
                     if 'value' in graph_data2:
@@ -322,60 +319,22 @@ def graph_api(data, hosp, deferred, utr, utr2):
                                     tzinfo=None)
                                 b = b.strftime('%d/%m/%Y %H:%M:%S')
                                 date, subject, sender = b, i['subject'], i['sender']['emailAddress']['address']
-                                mail_attach_filepath, sett_sno = '', ''
-                                temp = get_from_settlement(i['id'], subject, date)
-                                if temp is not None:
-                                    sett_sno, mail_attach_filepath = temp
-                                if mail_attach_filepath == '':
-                                    try:
-                                        flag = 0
-                                        if i['hasAttachments'] is True:
-                                            q = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/inbox/messages/{i['id']}/attachments"
-                                            attach_data = requests.get(q,
-                                                                       headers={'Authorization': 'Bearer ' + result[
-                                                                           'access_token']}, ).json()
-                                            for j in attach_data['value']:
-                                                if '@odata.mediaContentType' in j:
-                                                    j['name'] = j['name'].replace('.PDF', '.pdf')
-                                                    # print(j['@odata.mediaContentType'], j['name'])
-                                                    if file_blacklist(j['name'], email=sender):
-                                                        j['name'] = file_no(4) + j['name']
-                                                        with open(os.path.join(attachfile_path, j['name']), 'w+b') as fp:
-                                                            fp.write(base64.b64decode(j['contentBytes']))
-                                                        attach_path = os.path.join(attachfile_path, j['name'])
-                                                        flag = 1
-                                        if flag == 0:
-                                            filename = attachfile_path + file_no(8) + '.pdf'
-                                            if i['body']['contentType'] == 'html':
-                                                with open(attachfile_path + 'temp.html', 'w') as fp:
-                                                    fp.write(i['body']['content'])
-                                                pdfkit.from_file(attachfile_path +'temp.html', filename, configuration=pdfconfig)
-                                                attach_path = filename
-                                            elif i['body']['contentType'] == 'text':
-                                                with open(attachfile_path + 'temp.text', 'w') as fp:
-                                                    fp.write(i['body']['content'])
-                                                pdfkit.from_file(attachfile_path + 'temp.text', filename, configuration=pdfconfig)
-                                                attach_path = filename
-                                        mail_attach_filepath = attach_path
-                                        if mail_attach_filepath != '':
-                                            directory = f"../{hosp}/new_attach"
-                                            Path(directory).mkdir(parents=True, exist_ok=True)
-                                            dst = os.path.join(directory, os.path.split(mail_attach_filepath)[-1])
-                                            os.replace(mail_attach_filepath, dst)
-                                            mail_attach_filepath = os.path.abspath(dst)
-                                    except:
-                                        log_exceptions(mid=i['id'], hosp=hosp, folder=folder)
-                                insert_utr_mails_sett_mails(utr, utr2, sett_sno, i['id'], subject, date,
-                                                            mail_attach_filepath, sender, hosp,
-                                                            folder)
-                                # with mysql.connector.connect(**conn_data) as con:
-                                #     cur = con.cursor()
-                                #     q = f"insert into utr_mails_temp (`id`,`subject`,`date`,`sys_time`,`attach_path`, `sender`, `hospital`, `utr`, `folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                                #     data = (
-                                #     i['id'], subject, date, str(datetime.now()), mail_attach_filepath,
-                                #     sender, hosp, text, folder)
-                                #     cur.execute(q, data)
-                                #     con.commit()
+                                try:
+                                    attach_data = []
+                                    if i['hasAttachments'] is True:
+                                        # q = f"https://graph.microsoft.com/v1.0/users/{email}/mailFolders/{folder}/messages/{i['id']}/attachments"
+                                        q = f"https://graph.microsoft.com/v1.0/users/{email}/messages/{i['id']}/attachments"
+                                        attach_data1 = requests.get(q,
+                                                                   headers={'Authorization': 'Bearer ' + result[
+                                                                       'access_token']}, ).json()
+                                        for j in attach_data1['value']:
+                                            if '@odata.mediaContentType' in j:
+                                                attach_data.append({'name': j['name'], 'size': j['size']})
+                                    temp = {"id": i["id"], "subject": subject, "date": date, "sender": sender,
+                                            'attach_data': attach_data}
+                                    mails.append(temp)
+                                except:
+                                    log_exceptions(mid=i['id'], hosp=hosp, folder=folder)
                             except:
                                 log_exceptions(mid=i['id'], hosp=hosp, folder=folder)
                                 failed_mails(i['id'], date, subject, hosp, folder)
@@ -383,15 +342,14 @@ def graph_api(data, hosp, deferred, utr, utr2):
                     else:
                         with open('logs/query.log', 'a') as fp:
                             print(query, file=fp)
-                    if '@odata.nextLink' in graph_data2:
-                        query = graph_data2['@odata.nextLink']
-                    else:
-                        break
     except:
         log_exceptions(hosp=hosp)
+    finally:
+        return mails
 
-def imap_(data, hosp, deferred, utr, utr2):
+def imap_(data, hosp, deferred, text, cdate):
     try:
+        mails = []
         print(hosp)
         after = datetime.now() - timedelta(minutes=mail_time)
         after = after.strftime('%d-%b-%Y')
@@ -405,9 +363,7 @@ def imap_(data, hosp, deferred, utr, utr2):
             with open('logs/folders.log', 'a') as tfp:
                 print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
             imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
-            # Find all emails in inbox and print out the raw email data
-            # _, message_numbers_raw = imap_server.search(None, 'ALL')
-            _, message_numbers_raw = imap_server.search(None, f'(TEXT "{utr2}")')
+            _, message_numbers_raw = imap_server.search(None, f'(TEXT "{text}")')
             for message_number in message_numbers_raw[0].split():
                 signal.signal(signal.SIGALRM, alarm_handler)
                 signal.alarm(time_out)
@@ -416,7 +372,10 @@ def imap_(data, hosp, deferred, utr, utr2):
                     message = email.message_from_bytes(msg[0][1])
                     sender = message['from']
                     sender = sender.split('<')[-1].replace('>', '')
-                    date = format_date(message['Date'])
+                    try:
+                        date = format_date(message['Date'])
+                    except:
+                        date = ""
                     subject = message['Subject'].strip()
                     if '?' in subject:
                         try:
@@ -427,44 +386,19 @@ def imap_(data, hosp, deferred, utr, utr2):
                     for i in ['\r', '\n', '\t']:
                         subject = subject.replace(i, '').strip()
                     mid = int(message_number)
-                    mail_attach_filepath, sett_sno = '', ''
-                    temp = get_from_settlement(mid, subject, date)
-                    if temp is not None:
-                        sett_sno, mail_attach_filepath = temp
-                    if mail_attach_filepath == '':
-                        try:
-                            a = save_attachment(message, attachfile_path, email=sender)
-                            if not isinstance(a, list):
-                                filename = attachfile_path + file_no(8) + '.pdf'
-                                pdfkit.from_file(a, filename, configuration=pdfconfig)
-                            else:
-                                filename = a[-1]
-                            mail_attach_filepath = filename
-                            if mail_attach_filepath != '':
-                                directory = f"../{hosp}/new_attach"
-                                Path(directory).mkdir(parents=True, exist_ok=True)
-                                dst = os.path.join(directory, os.path.split(mail_attach_filepath)[-1])
-                                os.replace(mail_attach_filepath, dst)
-                                mail_attach_filepath = os.path.abspath(dst)
-                        except:
-                            log_exceptions(subject=subject, date=date, hosp=hosp, folder=folder)
-                    insert_utr_mails_sett_mails(utr, utr2, sett_sno, mid, subject, date,
-                                                mail_attach_filepath, sender, hosp,
-                                                folder)
-                    # with mysql.connector.connect(**conn_data) as con:
-                    #     cur = con.cursor()
-                    #     q = f"insert into utr_mails_temp (`id`,`subject`,`date`,`sys_time`,`attach_path`, `sender`, `hospital`, `utr`, `folder`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                    #     data = (
-                    #         mid, subject, date, str(datetime.now()), mail_attach_filepath,
-                    #         sender, hosp, text, folder)
-                    #     cur.execute(q, data)
-                    #     con.commit()
+                    attach_data = []
+                    attach_data = save_attachment(message, attachfile_path, email=sender)
+                    temp = {"id": mid, "subject": subject, "date": date, "sender": sender,
+                            'attach_data': attach_data}
+                    mails.append(temp)
                 except:
                     log_exceptions(subject=subject, date=date, hosp=hosp, folder=folder)
                     failed_mails(mid, date, subject, hosp, folder)
                 signal.alarm(0)
     except:
         log_exceptions(hosp=hosp)
+    finally:
+        return mails
 
 def mail_mover(hospital, deferred):
     fields = ("id","subject","date","sys_time","attach_path","completed","sender","hospital","insurer","process","deferred","sno")
@@ -498,12 +432,10 @@ def search(text, hospital, cdate):
     data, hosp = hospital_data[hospital], hospital
     if data['mode'] == 'gmail_api':
         mails = gmail_api(data, hosp, deferred, text, cdate)
-    # elif data['mode'] == 'graph_api':
-    #     graph_api(data, hosp, deferred, utr, utr)
-    #     graph_api(data, hosp, deferred, utr, utr2)
-    # elif data['mode'] == 'imap_':
-    #     imap_(data, hosp, deferred, utr, utr)
-    #     imap_(data, hosp, deferred, utr, utr2)
+    elif data['mode'] == 'graph_api':
+        mails = graph_api(data, hosp, deferred, text, cdate)
+    elif data['mode'] == 'imap_':
+        mails = imap_(data, hosp, deferred, text, cdate)
     return mails
 
 def mail_storage_job(hospital, deferred):
@@ -593,10 +525,6 @@ def main():
             utr_list = utrs[group]
             for utr in utr_list:
                 try:
-                    ####for test purpose
-                    # utr = 'SIN02418Q1047845'
-                    # hosp_list = ['ils', 'ils_dumdum', 'ils_howrah', 'ils_agartala', 'ils_ho']
-                    ####
                     print(utr)
                     flag = 'p'
                     with mysql.connector.connect(**conn_data) as con:
