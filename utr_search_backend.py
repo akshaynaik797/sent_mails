@@ -286,8 +286,6 @@ def graph_api(data, hosp, deferred, text, cdate):
         print(hosp)
         cdate = datetime.strptime(cdate, '%d/%m/%Y %H:%M:%S')
         fromtime, totime = cdate-timedelta(minutes=15), cdate+timedelta(minutes=15)
-        fromtime = fromtime.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        totime = totime.astimezone(pytz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         attachfile_path = os.path.join(hosp, 'new_attach/')
         email = data['data']['email']
         cred_file = data['data']['json_file']
@@ -314,9 +312,12 @@ def graph_api(data, hosp, deferred, text, cdate):
                             try:
                                 date, subject, attach_path, sender = '', '', '', ''
                                 format = "%Y-%m-%dT%H:%M:%SZ"
+                                #'sentDateTime'
                                 b = datetime.strptime(i['receivedDateTime'], format).replace(tzinfo=pytz.utc).astimezone(
                                     pytz.timezone('Asia/Kolkata')).replace(
                                     tzinfo=None)
+                                if not fromtime < b < totime:
+                                    continue
                                 b = b.strftime('%d/%m/%Y %H:%M:%S')
                                 date, subject, sender = b, i['subject'], i['sender']['emailAddress']['address']
                                 try:
