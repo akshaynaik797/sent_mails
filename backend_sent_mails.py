@@ -43,7 +43,7 @@ def ins_sentmaillogs(transaction_id, refno, cdate, doc_count, push_content, push
         con.commit()
 
 def process_sent_mails():
-    htlog_data, srno = [], 18205
+    htlog_data, srno = [], 18305
 
     q = "select * from hospitalTLog where transactionID != '' and srno>%s and sent_mails_processed is null order by srno"
 
@@ -79,6 +79,8 @@ def process_sent_mails():
                 q = "select * from sentmaillogs where transactionID=%s limit 1"
                 cur.execute(q, (row['transactionID'],))
                 r = cur.fetchone()
+                ####for test purpose
+                # r = None
                 if r is None:
                     print(row['srno'])
                     r1_data, r2_data = [], []
@@ -158,7 +160,8 @@ def process_sent_mails():
                                         except:
                                             log_exceptions(docSize=doc['docSize'])
                                     if mail_doc_size != db_doc_size and abs(mail_doc_size - db_doc_size) > 500:
-                                        pbody, pstatus = api_update_trigger(row['Type_Ref'] + pname, "URGENT", "SIZE MISMATCH")
+                                        diff = str(abs(mail_doc_size - db_doc_size)/1000) + ' KB'
+                                        pbody, pstatus = api_update_trigger(row['Type_Ref'] + pname, "URGENT", "SIZE MISMATCH " + diff)
                                         ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
                                                          len(r2_data),
                                                          pbody, pstatus)
