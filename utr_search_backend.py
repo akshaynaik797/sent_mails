@@ -21,6 +21,7 @@ from dateutil.parser import parse
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 from pytz import timezone
 from email.header import decode_header
 
@@ -164,8 +165,10 @@ def get_ins(subject, email, date):
         return '', ''
 
 
-def get_folders(hospital, deferred):
+def get_folders(hospital, **kwargs):
     q = "select folder from sent_mails_config where hospital=%s"
+    if 'received' in kwargs:
+        q = "select folder1 from sent_mails_config where hospital1=%s limit 1"
     with mysql.connector.connect(**portals_conn_data) as con:
         cur = con.cursor()
         cur.execute(q, (hospital,))
@@ -213,7 +216,7 @@ def gmail_api(data, hosp, deferred, text, cdate):
             with open(token_file, 'wb') as token:
                 pickle.dump(creds, token)
         service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
-        for folder in get_folders(hosp, deferred):
+        for folder in get_folders(hosp):
             with open('logs/folders.log', 'a') as tfp:
                 print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
             q = f"subject:{text} and after:{fromtime} before:{totime}"
@@ -280,6 +283,99 @@ def gmail_api(data, hosp, deferred, text, cdate):
     finally:
         return mails
 
+def gmail_apiv2(data, hosp, deferred, text, cdate):
+    mails = []
+    try:
+        print(hosp)
+        cdate = datetime.strptime(cdate, '%d/%m/%Y %H:%M:%S')
+        fromtime, totime = cdate-timedelta(minutes=15), cdate+timedelta(minutes=15)
+        fromtime, totime = int(fromtime.timestamp()), int(totime.timestamp())
+        token_file = data['data']['token_file']
+        cred_file = data['data']['json_file']
+        SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+
+        creds = None
+        if os.path.exists(token_file):
+            creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    cred_file, SCOPES)
+                creds = flow.run_local_server(port=0)
+            with open(token_file, 'w') as token:
+                token.write(creds.to_json())
+
+        service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
+        for folder in get_folders(hosp, received='X'):
+            with open('logs/folders.log', 'a') as tfp:
+                print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
+            q = f"subject:{text} and after:{fromtime} before:{totime}"
+            # results = service.users().labels()
+            # request = results.list(userId='me')
+            results = service.users().messages()
+            request = results.list(userId='me', labelIds=[folder], q=q)
+            while request is not None:
+                msg_col = request.execute()
+                messages = msg_col.get('messages', [])
+                custom_log_data(filename=hosp+'_mails', data=messages)
+                if not messages:
+                    pass
+                    #print("No messages found.")
+                else:
+                    # print("Message snippets:")
+                    for message in messages[::-1]:
+                        temp = {}
+                        signal.signal(signal.SIGALRM, alarm_handler)
+                        signal.alarm(time_out)
+                        try:
+                            id, subject, date, filename, sender = '', '', '', '', ''
+                            msg = service.users().messages().get(userId='me', id=message['id']).execute()
+                            id = msg['id']
+                            for i in msg['payload']['headers']:
+                                if i['name'] == 'Subject':
+                                    subject = i['value']
+                                if i['name'] == 'From':
+                                    sender = i['value']
+                                    sender = sender.split('<')[-1].replace('>', '')
+                                if i['name'] == 'Date':
+                                    date = i['value']
+                                    date = date.split(',')[-1].strip()
+                                    format = '%d %b %Y %H:%M:%S %z'
+                                    if '(' in date:
+                                        date = date.split('(')[0].strip()
+                                    try:
+                                        date = datetime.strptime(date, format)
+                                    except:
+                                        try:
+                                            date = parse(date)
+                                        except:
+                                            with open('logs/date_err.log', 'a') as fp:
+                                                print(date, file=fp)
+                                            raise Exception
+                                    date = date.astimezone(timezone('Asia/Kolkata')).replace(tzinfo=None)
+                                    format1 = '%d/%m/%Y %H:%M:%S'
+                                    date = date.strftime(format1)
+                            attach_data = []
+                            if 'parts' in msg['payload']:
+                                for j in msg['payload']['parts']:
+                                    if 'attachmentId' in j['body']:
+                                        attach_data.append({'name': j['filename'], 'size': j['body']['size']})
+                            temp = {"id": id, "subject": subject, "date": date, "sender": sender,
+                                    'attach_data': attach_data}
+                            mails.append(temp)
+                        except:
+                            log_exceptions(id=id, hosp=hosp, folder=folder)
+                            failed_mails(id, date, subject, hosp, folder)
+                        signal.alarm(0)
+                request = results.list_next(request, msg_col)
+    except:
+        log_exceptions(hosp=hosp)
+    finally:
+        return mails
+
+
 def graph_api(data, hosp, deferred, text, cdate):
     try:
         mails = []
@@ -299,7 +395,7 @@ def graph_api(data, hosp, deferred, text, cdate):
             logging.info("No suitable token exists in cache. Let's get a new one from AAD.")
             result = app.acquire_token_for_client(scopes=config["scope"])
         if "access_token" in result:
-            for folder in get_folders(hosp, deferred):
+            for folder in get_folders(hosp):
                 with open('logs/folders.log', 'a') as tfp:
                     print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
                     query = f'https://graph.microsoft.com/v1.0/users/{email}/messages?$search="{text}"'
@@ -352,19 +448,19 @@ def imap_(data, hosp, deferred, text, cdate):
     try:
         mails = []
         print(hosp)
-        after = datetime.now() - timedelta(minutes=mail_time)
-        after = after.strftime('%d-%b-%Y')
+        cdate = datetime.strptime(cdate, '%d/%m/%Y %H:%M:%S')
+        fromtime, totime = cdate - timedelta(minutes=15), cdate + timedelta(minutes=15)
+        fromtime = fromtime.strftime('%d-%b-%Y')
         attachfile_path = os.path.join(hosp, 'new_attach/')
         server, email_id, password = data['data']['host'], data['data']['email'], data['data']['password']
-        today = datetime.now().strftime('%d-%b-%Y')
         imap_server = imaplib.IMAP4_SSL(host=server)
-        table = f'{hosp}_mails'
         imap_server.login(email_id, password)
-        for folder in get_folders(hosp, deferred):
+        for folder in get_folders(hosp):
             with open('logs/folders.log', 'a') as tfp:
                 print(str(datetime.now()), hosp, folder, sep=',', file=tfp)
             imap_server.select(readonly=True, mailbox=f'"{folder}"')  # Default is `INBOX`
-            _, message_numbers_raw = imap_server.search(None, f'(TEXT "{text}")')
+            # _, message_numbers_raw = imap_server.search(None, f'(SINCE "{fromtime}" BEFORE "{totime}")')
+            _, message_numbers_raw = imap_server.search(None, f'(TEXT "{text}" SINCE "{fromtime}")')
             for message_number in message_numbers_raw[0].split():
                 signal.signal(signal.SIGALRM, alarm_handler)
                 signal.alarm(time_out)
@@ -437,6 +533,8 @@ def search(text, hospital, cdate):
         mails = graph_api(data, hosp, deferred, text, cdate)
     elif data['mode'] == 'imap_':
         mails = imap_(data, hosp, deferred, text, cdate)
+    elif data['mode'] == 'gmail_apiv2':
+        mails = gmail_apiv2(data, hosp, deferred, text, cdate)
     return mails
 
 def mail_storage_job(hospital, deferred):

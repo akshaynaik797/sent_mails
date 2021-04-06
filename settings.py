@@ -27,6 +27,22 @@ interval = 60 #seconds
 pdfconfig = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')
 
 hospital_data = {
+    'iclaim': {
+        "mode": "gmail_apiv2",
+        "data": {
+            "json_file": 'data/cred_iclaim.json',
+            "token_file": "data/token_iclaim.json"
+        }
+    },
+
+    'mediclaimnoble': {
+        "mode": "gmail_apiv2",
+        "data": {
+            "json_file": 'data/cred_mediclaimnoble.json',
+            "token_file": "data/token_mediclaimnoble.json"
+        }
+    },
+
     'inamdar': {
         "mode": "gmail_api",
         "data": {
