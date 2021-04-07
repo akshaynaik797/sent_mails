@@ -49,7 +49,7 @@ def process_sent_mails():
     q = "select * from hospitalTLog where transactionID != '' and srno>%s and sent_mails_processed is null order by srno"
 
     ####for test purpose
-    q = "select * from hospitalTLog where transactionID != '' and srno=%s order by srno desc"
+    # q = "select * from hospitalTLog where transactionID != '' and srno=%s order by srno desc"
 
     with mysql.connector.connect(**portals_conn_data) as con:
         cur = con.cursor()
@@ -66,13 +66,13 @@ def process_sent_mails():
 
     for row in htlog_data:
         try:
-            row["cdate"] = '07/04/2021 12:37:41'
             cdate = datetime.strptime(row["cdate"], '%d/%m/%Y %H:%M:%S') + timedelta(minutes=5)
 
             while 1:
                 if datetime.now() > cdate:
                     break
                 time.sleep(60)
+                print('.')
             r1_data, r2_data, alerts, main_diff, pname = [], [], [], 0, '-'
             q = "select p_sname from preauth where refno=%s limit 1"
             dbconf = get_db_conf(hosp=row['HospitalID'])
@@ -89,7 +89,7 @@ def process_sent_mails():
                 cur.execute(q, (row['transactionID'],))
                 r = cur.fetchone()
             ####for test purpose
-            r = None
+            # r = None
             if r is None:
                 print(row['srno'])
                 data1 = {'hospitalID': row['HospitalID'], 'transactionID': row['transactionID']}
