@@ -285,4 +285,5 @@ if __name__ == '__main__':
     while 1:
         print('process_sent_mails')
         process_sent_mails()
+        time.sleep(60)
         print('done')
