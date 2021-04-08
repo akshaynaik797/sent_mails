@@ -234,14 +234,14 @@ def process_sent_mails():
                         # ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'], len(r2_data),
                         #                  pbody, pstatus)
                         # cond_flag = 1
-                    if True in count_mismatch:
+                    if True in count_mismatch and True in rec_count_mismatch:
                         alerts.append("URGENT-COUNT MISMATCH-" + hospital + '-SENTMAILS')
                         # pbody, pstatus = api_update_trigger(row['Type_Ref'] + pname, "URGENT", "COUNT MISMATCH")
                         # ins_sentmaillogs(row['transactionID'], row['Type_Ref'], row['cdate'],
                         #                  len(r2_data),
                         #                  pbody, pstatus)
                         # cond_flag = 1
-                    if True in size_mismatch:
+                    if True in size_mismatch and True in rec_size_mismatch:
                         alerts.append("URGENT-SIZE MISMATCH-" + hospital + '-SENTMAILS ' + str(main_diff) + ' KB')
                         # pbody, pstatus = api_update_trigger(row['Type_Ref'] + pname, "URGENT",
                         #                                     "SIZE MISMATCH " + main_diff + ' KB')
