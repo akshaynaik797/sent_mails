@@ -66,7 +66,7 @@ def process_sent_mails():
 
     for row in htlog_data:
         try:
-            cdate = datetime.strptime(row["cdate"], '%d/%m/%Y %H:%M:%S') + timedelta(minutes=5)
+            cdate = datetime.strptime(row["cdate"], '%d/%m/%Y %H:%M:%S') + timedelta(minutes=15)
 
             while 1:
                 if datetime.now() > cdate:
