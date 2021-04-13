@@ -18,6 +18,7 @@ import msal
 import pdfkit
 import requests
 from dateutil.parser import parse
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -27,6 +28,7 @@ from email.header import decode_header
 
 
 from make_log import log_exceptions, custom_log_data
+from push_api import api_update_trigger
 from settings import mail_time, file_no, file_blacklist, conn_data, pdfconfig, format_date, save_attachment, \
     hospital_data, interval, clean_filename, time_out, gen_dict_extract, portals_conn_data
 
@@ -370,6 +372,9 @@ def gmail_apiv2(data, hosp, deferred, text, cdate):
                             failed_mails(id, date, subject, hosp, folder)
                         signal.alarm(0)
                 request = results.list_next(request, msg_col)
+    except RefreshError:
+        api_update_trigger(hosp, "URGENT", 'token expired')
+        log_exceptions(hosp=hosp)
     except:
         log_exceptions(hosp=hosp)
     finally:
