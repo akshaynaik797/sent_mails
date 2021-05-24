@@ -8,12 +8,12 @@ from pathlib import Path
 from dateutil.parser import parse
 from pytz import timezone
 
-conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",
+conn_data = {'host': "database-iclaim.caq5osti8c47.ap-south-1.rds.amazonaws.com",
              'user': "admin",
              'password': "Welcome1!",
              'database': 'python'}
 
-portals_conn_data = {'host': "iclaimdev.caq5osti8c47.ap-south-1.rds.amazonaws.com",
+portals_conn_data = {'host': "database-iclaim.caq5osti8c47.ap-south-1.rds.amazonaws.com",
              'user': "admin",
              'password': "Welcome1!",
              'database': 'portals'}
