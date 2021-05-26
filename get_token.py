@@ -49,6 +49,7 @@ def gmail_apiv2(data, hosp, deferred, text, cdate):
         fromtime, totime = cdate-timedelta(minutes=15), cdate+timedelta(minutes=15)
         fromtime, totime = int(fromtime.timestamp()), int(totime.timestamp())
         token_file = data['data']['token_file']
+        os.remove(token_file)
         cred_file = data['data']['json_file']
         SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
